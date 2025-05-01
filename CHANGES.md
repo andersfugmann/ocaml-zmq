@@ -1,3 +1,17 @@
+6.0.0 Unreleased.
+---
+* Solve problem with EINTR.
+  Add `send_all_r`, `send_all_msg_r`, `recv_all_r` and `recv_all_msg_r`
+  to allow resuming if the calls raise EAGIN or EINTR.
+
+* Deprecate `send_all`, `send_all_msg`, `recv_all` and `recv_all_msg`
+  as resumable functions should be used instead.
+
+* Fix deprecation warning on use of Async_kernel.Ivar.fill
+
+* lwt and async now retry on EINTR and EAGAIN and handles
+  recv|send_*_all function correctly.
+
 5.3.0
 ---
 * Add eio binding in zmq-eio (#126, @andersfugmann)
