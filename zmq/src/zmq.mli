@@ -126,7 +126,7 @@ module Socket : sig
 
   (** Read a complete multipart message from the socket.
       @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
-      @return {!resumable} to allow resuming the operation in case of EINTR or EGAGIN.
+      @return {!resumable} to allow resuming the operation in case of EINTR or EAGAIN.
   *)
   val recv_all_r : ?block:bool -> 'a t -> string list resumable
 
