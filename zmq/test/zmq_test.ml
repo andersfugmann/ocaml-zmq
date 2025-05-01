@@ -311,11 +311,18 @@ let suite =
              let endpoint = "inproc://endpoint" in
              bind rep endpoint;
              connect req endpoint;
-             send_all req ["request"; "and more"];
-             let msg = recv_all rep in
+             let send = send_all_r req ["request"; "and more"] in
+             send ();
+
+
+             let recv = recv_all_r rep in
+             let msg = recv () in
              assert_equal ["request"; "and more"] msg;
-             send_all rep ["reply"; "and more"];
-             let msg = recv_all req in
+             let send = send_all_r rep ["reply"; "and more"] in
+             send ();
+             let recv = recv_all_r req in
+             let msg = recv () in
+
              assert_equal ["reply"; "and more"] msg
            )
            (fun (ctx, req, rep) ->

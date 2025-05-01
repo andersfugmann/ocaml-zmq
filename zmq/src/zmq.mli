@@ -95,6 +95,10 @@ module Socket : sig
   val bind : 'a t -> string -> unit
   val unbind : 'a t -> string -> unit
 
+  (** Resumable.
+      Allows repeated calls until the operation has completed. Usefull to repeat calls if EINTR or EGAGIN is raised *)
+  type 'a resumable = unit -> 'a
+
   (** Read a message from the socket.
       block indicates if the call should be blocking or non-blocking.
       If block is [false], [recv] will raise [Unix.Unix_error (Unix.EAGAIN, _, _)] if there are no messages available to receive on the specified socket.
@@ -103,50 +107,77 @@ module Socket : sig
   val recv : ?block:bool -> 'a t -> string
 
   (** Read a complete multipart message from the socket.
-      block indicates if the call should be blocking or non-blocking. Default true
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated Use [recv_all_r] to allow resuming the operation
   *)
   val recv_all : ?block:bool -> 'a t -> string list
 
+  (** Read a complete multipart message from the socket.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      The function returns a [resumable] to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val recv_all_r : ?block:bool -> 'a t -> string list resumable
+
   (** Send a message to the socket.
-      block indicates if the call should be blocking or non-blocking. Default true
-      more is used for multipart messages, and indicates that the more message parts will follow. Default false
+      @param block indicates if the call should be blocking or non-blocking.
+             Defaults to [true].
+      @param more indicate that more messages will follow and will be joined into a multipart message.
+             Defaults to [true].
   *)
   val send : ?block:bool -> ?more:bool -> 'a t -> string -> unit
 
   (** Send a multipart message to the socket.
-      block indicates if the call should be blocking or non-blocking. Default true
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated Use [send_all_r] to allow resuming the operation
   *)
   val send_all : ?block:bool -> 'a t -> string list -> unit
 
-  (** Receive a {!Msg.t} on the socket.
+  (** Send a multipart message to the socket.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      The function returns a [resumable] to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val send_all_r : ?block:bool -> 'a t -> string list -> unit resumable
 
+
+  (** Receive a {!Msg.t} on the socket.
       @param block indicates if the call should be blocking or non-blocking.
              Defaults to [true].
   *)
   val recv_msg : ?block:bool -> 'a t -> Msg.t
 
   (** Receive a multi-part message on the socket.
-
-      @param block indicates if the call should be blocking or non-blocking.
-             Defaults to [true].
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated Use [recv_msg_all_r] to allow resuming the operation
   *)
   val recv_msg_all : ?block:bool -> 'a t -> Msg.t list
 
-  (** Send a {!Msg.t} to the socket.
+  (** Receive a multi-part message on the socket.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      The function returns a [resumable] to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val recv_msg_all_r : ?block:bool -> 'a t -> Msg.t list resumable
 
+(** Send a {!Msg.t} to the socket.
       @param block indicates if the call should be blocking or non-blocking.
              Defaults to [true].
       @param more is used for multipart messages  Set to [true] to indicate that
-             more message parts will follow.  Defaults to [false].
+             more message parts will follow. Defaults to [false].
   *)
   val send_msg : ?block:bool -> ?more:bool -> 'a t -> Msg.t -> unit
 
   (** Send a multi-part message to the socket.
-
       @param block indicates if the call should be blocking or non-blocking.
              Defaults to [true].
+      @deprecated Use [send_msg_all_r] to allow resuming the operation
   *)
   val send_msg_all : ?block:bool -> 'a t -> Msg.t list -> unit
+
+  (** Send a multi-part message to the socket.
+      @param block indicates if the call should be blocking or non-blocking.
+             Defaults to [true].
+      The function returns a [resumable] to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val send_msg_all_r : ?block:bool -> 'a t -> Msg.t list -> unit resumable
 
   (** Option Getter and Setters *)
 
