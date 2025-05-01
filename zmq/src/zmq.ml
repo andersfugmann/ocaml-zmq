@@ -13,6 +13,9 @@ exception ZMQ_exception of error * string
 
 external version : unit -> int * int * int = "caml_zmq_version"
 
+type 'a resumable = unit -> 'a
+
+
 module Context = struct
   type t
 
@@ -492,7 +495,6 @@ module Socket = struct
   type event = No_event | Poll_in | Poll_out | Poll_in_out | Poll_error
   external events : 'a t -> event = "caml_zmq_get_events"
 
-  type 'a resumable = unit -> 'a
 
   (** Allow resuming receive of a multipart message.
       The function returns a function that can be "resumed" in case of EGAGIN or EINTR.
@@ -528,6 +530,7 @@ module Socket = struct
     in
     cont f ?block socket
 
+  (** This function should never be used. It does not allow resuming if a signal is received, which may leave half read multi part messages on the socket. *)
   let recv_all_wrapper (f : ?block:bool -> _ t -> _) =
     (* Once the first message part is received all remaining message parts can
        be received without blocking. *)
@@ -682,6 +685,20 @@ module Monitor = struct
     assert (Socket.has_more socket);
     let addr = Socket.recv ~block:false socket in
     decode_monitor_event event addr
+
+  let recv_r ?block socket =
+    let event = ref None in
+    let rec cont () =
+      match !event with
+      | None ->
+        event := Some (Socket.recv ?block socket);
+        cont ()
+      | Some event ->
+        assert (Socket.has_more socket);
+        let addr = Socket.recv ~block:false socket in
+        decode_monitor_event event addr
+    in
+    cont
 
   let get_peer_address fd =
     try

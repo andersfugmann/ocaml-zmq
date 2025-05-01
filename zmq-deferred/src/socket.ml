@@ -234,7 +234,7 @@ module Make(T: Deferred.T) = struct
   end
 
   module Monitor = struct
-    let recv s = post s Receive (fun s () -> Zmq.Monitor.recv ~block:false s)
+    let recv s = post s Receive (fun s -> Zmq.Monitor.recv_r ~block:false s)
   end
 
 end

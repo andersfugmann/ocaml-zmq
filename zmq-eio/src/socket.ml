@@ -21,9 +21,8 @@ let process queue =
   | () ->
     let (_: unit -> unit) = Queue.pop queue in
     ()
-  | exception Unix.Unix_error (Unix.EAGAIN, _, _) ->
-    (* If f raised EAGAIN, dont pop the message. *)
-    (* This should never happen. If so, the queue could be replaced with a Eio.Stream for faster handling *)
+  | exception Unix.Unix_error ((Unix.EAGAIN | Unix.EINTR), _, _) ->
+    (* Leave the function on the queue to be retried *)
     ()
 
 let with_lock lock f =
@@ -123,10 +122,10 @@ let send_msg t message =
   request t t.senders (fun () -> Zmq.Socket.send_msg ~block:false t.socket message)
 
 let send_all t messages =
-  request t t.senders (fun () -> Zmq.Socket.send_all ~block:false t.socket messages)
+  request t t.senders (Zmq.Socket.send_all_r ~block:false t.socket messages)
 
 let send_msg_all t messages =
-  request t t.senders (fun () -> Zmq.Socket.send_msg_all ~block:false t.socket messages)
+  request t t.senders (Zmq.Socket.send_msg_all_r ~block:false t.socket messages)
 
 let recv t =
   request t t.receivers (fun () -> Zmq.Socket.recv ~block:false t.socket)
@@ -135,10 +134,10 @@ let recv_msg t =
   request t t.receivers (fun () -> Zmq.Socket.recv_msg ~block:false t.socket)
 
 let recv_all t =
-  request t t.receivers (fun () -> Zmq.Socket.recv_all ~block:false t.socket)
+  request t t.receivers (Zmq.Socket.recv_all_r ~block:false t.socket)
 
 let recv_msg_all t =
-  request t t.receivers (fun () -> Zmq.Socket.recv_msg_all ~block:false t.socket)
+  request t t.receivers (Zmq.Socket.recv_msg_all_r ~block:false t.socket)
 
 module Router = struct
   type id_t = string
@@ -155,5 +154,5 @@ module Router = struct
 end
 
 module Monitor = struct
-  let recv t = request t t.receivers (fun () -> Zmq.Monitor.recv ~block:false t.socket)
+  let recv t = request t t.receivers (Zmq.Monitor.recv_r ~block:false t.socket)
 end

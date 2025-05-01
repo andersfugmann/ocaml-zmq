@@ -10,6 +10,10 @@ type error =
 
 exception ZMQ_exception of error * string
 
+(** Resumable.
+    Allows repeated calls until the operation has completed. Usefull to repeat calls if EINTR or EGAGIN is raised *)
+type 'a resumable = unit -> 'a
+
 val version : unit -> int * int * int
 
 module Context : sig
@@ -94,10 +98,6 @@ module Socket : sig
   val disconnect : 'a t -> string -> unit
   val bind : 'a t -> string -> unit
   val unbind : 'a t -> string -> unit
-
-  (** Resumable.
-      Allows repeated calls until the operation has completed. Usefull to repeat calls if EINTR or EGAGIN is raised *)
-  type 'a resumable = unit -> 'a
 
   (** Read a message from the socket.
       block indicates if the call should be blocking or non-blocking.
@@ -345,9 +345,16 @@ module Monitor : sig
   val connect: Context.t -> t -> [<`Monitor] Socket.t
 
   (** Receive an event from the monitor socket.
-      block indicates if the call should be blocking or non-blocking. Default true
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated Use [recv_r] to allow resuming the operation
   *)
   val recv: ?block:bool -> [< `Monitor ] Socket.t -> event
+
+  (** Receive an event from the monitor socket.
+      The function returns a [resumable] to allow resuming the operation in case of EINTR or EGAGIN.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+  *)
+  val recv_r: ?block:bool -> [< `Monitor ] Socket.t -> event resumable
 
   val string_of_event: event -> string
 
