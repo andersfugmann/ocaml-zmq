@@ -13,21 +13,32 @@ exception ZMQ_exception of error * string
 
 external version : unit -> int * int * int = "caml_zmq_version"
 
+let rec retry_on_intr1 f a = try f a with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr1 f a
+let rec retry_on_intr2 f a b = try f a b with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr2 f a b
+let rec retry_on_intr3 f a b c = try f a b c with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr3 f a b c
+let rec retry_on_intr4: ('a -> 'b -> 'c -> 'd -> 'ret) -> 'a -> 'b -> 'c -> 'd -> 'ret = fun f a b c d ->
+  try f a b c d with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr4 f a b c d
+
+
 module Context = struct
   type t
 
-  external create : unit -> t = "caml_zmq_new"
-  external terminate : t -> unit = "caml_zmq_term"
+  external create_native : unit -> t = "caml_zmq_new"
+  let create = retry_on_intr1 create_native
+
+  external terminate_native : t -> unit = "caml_zmq_term"
+  let terminate = retry_on_intr1 terminate_native
 
   type int_option =
   | ZMQ_IO_THREADS
   | ZMQ_MAX_SOCKETS
   | ZMQ_IPV6
 
-  external set_int_option :
-    t -> int_option -> int -> unit = "caml_zmq_ctx_set_int_option"
-  external get_int_option :
-    t -> int_option -> int = "caml_zmq_ctx_get_int_option"
+  external set_int_option_native : t -> int_option -> int -> unit = "caml_zmq_ctx_set_int_option"
+  let set_int_option = retry_on_intr3 set_int_option_native
+
+  external get_int_option_native : t -> int_option -> int = "caml_zmq_ctx_get_int_option"
+  let get_int_option = retry_on_intr2 get_int_option_native
 
   let get_io_threads ctx =
     get_int_option ctx ZMQ_IO_THREADS
@@ -55,8 +66,7 @@ module Msg = struct
   type t
   type bigstring = (char, int8_unsigned_elt, c_layout) Array1.t
 
-  external native_init_data : bigstring -> int -> int -> t =
-    "caml_zmq_msg_init_data"
+  external init_data_native : bigstring -> int -> int -> t = "caml_zmq_msg_init_data"
 
   let init_data ?(offset = 0) ?length buf =
     let length =
@@ -65,11 +75,13 @@ module Msg = struct
       | Some l -> min l max_possible
       | None -> max_possible
     in
-    native_init_data buf offset length
+    retry_on_intr3 init_data_native buf offset length
 
-  external size : t -> int = "caml_zmq_msg_size"
+  external size_native : t -> int = "caml_zmq_msg_size"
+  let size = retry_on_intr1 size_native
 
-  external unsafe_data : t -> bigstring = "caml_zmq_msg_data"
+  external unsafe_data_native : t -> bigstring = "caml_zmq_msg_data"
+  let unsafe_data = retry_on_intr1 unsafe_data_native
 
   let copy_data msg =
     let data = unsafe_data msg in
@@ -77,9 +89,11 @@ module Msg = struct
     Array1.blit data copy;
     copy
 
-  external close : t -> unit = "caml_zmq_msg_close"
+  external close_native : t -> unit = "caml_zmq_msg_close"
+  let close = retry_on_intr1 close_native
 
-  external gets : t -> string -> string = "caml_zmq_msg_gets"
+  external gets_native : t -> string -> string = "caml_zmq_msg_gets"
+  let gets = retry_on_intr2 gets_native
 end
 
 module Socket = struct
@@ -106,37 +120,52 @@ module Socket = struct
   let stream = 11
 
   (** Creation and Destruction *)
-  external create : Context.t -> 'a kind -> 'a t = "caml_zmq_socket"
-  external close : 'a t -> unit = "caml_zmq_close"
+  external create_native : Context.t -> 'a kind -> 'a t = "caml_zmq_socket"
+  let create = retry_on_intr2 create_native
+
+  external close_native : 'a t -> unit = "caml_zmq_close"
+  let close socket = retry_on_intr1 close_native socket
+
 
   (** Wiring *)
-  external connect : 'a t -> string -> unit = "caml_zmq_connect"
-  external disconnect : 'a t -> string -> unit = "caml_zmq_disconnect"
-  external bind : 'a t -> string -> unit = "caml_zmq_bind"
-  external unbind : 'a t -> string -> unit = "caml_zmq_unbind"
+  external connect_native : 'a t -> string -> unit = "caml_zmq_connect"
+  let connect socket = retry_on_intr2 connect_native socket
+
+  external disconnect_native : 'a t -> string -> unit = "caml_zmq_disconnect"
+  let disconnect socket = retry_on_intr2 disconnect_native socket
+
+  external bind_native : 'a t -> string -> unit = "caml_zmq_bind"
+  let bind socket = retry_on_intr2 bind_native socket
+
+  external unbind_native : 'a t -> string -> unit = "caml_zmq_unbind"
+  let unbind socket = retry_on_intr2 unbind_native socket
+
 
   (** Send and Receive *)
-  external native_recv : 'a t -> bool -> string = "caml_zmq_recv"
-  let recv ?(block = true) socket = native_recv socket block
+  external recv_native : 'a t -> bool -> string = "caml_zmq_recv"
+  let recv ?(block = true) socket = retry_on_intr2 recv_native socket block
 
-  external native_send : 'a t -> string -> bool -> bool -> unit = "caml_zmq_send"
-  let send ?(block = true) ?(more = false) socket message = native_send socket message block more
+  external send_native : 'a t -> string -> bool -> bool -> unit = "caml_zmq_send"
+  let send ?(block = true) ?(more = false) socket message =
+    retry_on_intr4 send_native socket message block more
 
-  external native_recv_msg : 'a t -> bool -> Msg.t = "caml_zmq_recv_msg"
-  let recv_msg ?(block = true) socket = native_recv_msg socket block
+  external recv_msg_native : 'a t -> bool -> Msg.t = "caml_zmq_recv_msg"
+  let recv_msg ?(block = true) socket =
+    retry_on_intr2 recv_msg_native socket block
 
-  external native_send_msg : 'a t -> Msg.t -> bool -> bool -> unit = "caml_zmq_send_msg"
-  let send_msg ?(block = true) ?(more = false) socket message = native_send_msg socket message block more
+  external send_msg_native : 'a t -> Msg.t -> bool -> bool -> unit = "caml_zmq_send_msg"
+  let send_msg ?(block = true) ?(more = false) socket message =
+    retry_on_intr4 send_msg_native socket message block more
 
   type int64_option =
   | ZMQ_AFFINITY
   | ZMQ_MAXMSGSIZE
 
-  external set_int64_option :
-    'a t -> int64_option -> int -> unit = "caml_zmq_set_int64_option"
+  external set_int64_option_native : 'a t -> int64_option -> int -> unit = "caml_zmq_set_int64_option"
+  let set_int64_option socket = retry_on_intr3 set_int64_option_native socket
 
-  external get_int64_option :
-    'a t -> int64_option -> int = "caml_zmq_get_int64_option"
+  external get_int64_option_native : 'a t -> int64_option -> int = "caml_zmq_get_int64_option"
+  let get_int64_option socket = retry_on_intr2 get_int64_option_native socket
 
 
   type string_option =
@@ -152,11 +181,12 @@ module Socket = struct
   | ZMQ_CURVE_SERVERKEY
   | ZMQ_ZAP_DOMAIN
 
-  external set_string_option :
-    'a t -> string_option -> string -> unit = "caml_zmq_set_string_option"
+  external set_string_option_native : 'a t -> string_option -> string -> unit = "caml_zmq_set_string_option"
+  let set_string_option socket = retry_on_intr3 set_string_option_native socket
 
-  external get_string_option :
-    'a t -> string_option -> int -> string = "caml_zmq_get_string_option"
+  external get_string_option_native : 'a t -> string_option -> int -> string = "caml_zmq_get_string_option"
+  let get_string_option socket = retry_on_intr3 get_string_option_native socket
+
 
   [@@@warning "-37"]
   type int_option =
@@ -194,12 +224,11 @@ module Socket = struct
   | ZMQ_STREAM_NOTIFY
   [@@@warning "+37"]
 
-  external set_int_option :
-    'a t -> int_option -> int -> unit = "caml_zmq_set_int_option"
+  external set_int_option_native : 'a t -> int_option -> int -> unit = "caml_zmq_set_int_option"
+  let set_int_option socket = retry_on_intr3 set_int_option_native socket
 
-  external get_int_option :
-    'a t -> int_option -> int = "caml_zmq_get_int_option"
-
+  external get_int_option_native : 'a t -> int_option -> int = "caml_zmq_get_int_option"
+  let get_int_option socket = retry_on_intr2 get_int_option_native socket
 
   let validate_string_length min max str msg =
     match String.length str with
@@ -487,44 +516,47 @@ module Socket = struct
   let set_stream_notify socket stream_notify_flag =
     set_int_option socket ZMQ_STREAM_NOTIFY (if stream_notify_flag then 1 else 0)
 
-  external get_fd : 'a t -> Unix.file_descr = "caml_zmq_get_fd"
+  external get_fd_native : 'a t -> Unix.file_descr = "caml_zmq_get_fd"
+  let get_fd socket = retry_on_intr1 get_fd_native socket
 
   type event = No_event | Poll_in | Poll_out | Poll_in_out | Poll_error
-  external events : 'a t -> event = "caml_zmq_get_events"
 
-  let recv_all_wrapper (f : ?block:bool -> _ t -> _) =
-    (* Once the first message part is received all remaining message parts can
-       be received without blocking. *)
-    let rec loop socket accu =
-      if has_more socket then
-        loop socket (f socket :: accu)
-      else
-        accu
+  external events_native : 'a t -> event = "caml_zmq_get_events"
+  let events socket = retry_on_intr1 events_native socket
+
+  (** Wrap recv all.
+      The ZMQ documentation states that multipart messages are received atomicly. So
+      reading following message parts must not block.
+      This function will read set [~block:true] for following message parts to ensure that
+      ZMQ will not return EAGAIN while receiving a multipart message.
+  *)
+  let recv_all_wrapper (f : ?block:bool -> 'a t -> 'b) =
+    let rec loop acc ?block socket =
+      let acc = f ?block socket :: acc in
+      match has_more socket with
+      | true -> loop acc ~block:true socket
+      | false -> List.rev acc
     in
-    fun ?block socket ->
-      let first = f ?block socket in
-      List.rev (loop socket [first])
+    fun ?block socket -> loop [] ?block socket
 
+  (** ZMQ documentation says that sending multipart messages should be atomic.
+      So, we assume that once the socket can send, all message-parts can be sent
+      Therefore, all subsequent message parts are sent with [~block:true] to avoid the function raising EAGAIN,
+      as its not possible to handle that gracefully - and may put the socket in a broken state.
+  *)
   let send_all_wrapper (f : ?block:bool -> ?more:bool -> _ t -> _ -> unit) =
     (* Once the first message part is sent all remaining message parts can
        be sent without blocking. *)
-    let rec send_all_inner_loop socket message =
-      match message with
-      | [] -> ()
-      | hd :: [] ->
-        f socket hd
-      | hd :: tl ->
-        f ~more:true socket hd;
-        send_all_inner_loop socket tl
-    in
-    fun ?block socket message ->
-      match message with
+    let rec send_all_inner_loop ?block socket =
+      function
       | [] -> ()
       | hd :: [] ->
         f ?block ~more:false socket hd
       | hd :: tl ->
         f ?block ~more:true socket hd;
-        send_all_inner_loop socket tl
+        send_all_inner_loop ~block:true socket tl
+    in
+    send_all_inner_loop
 
   let recv_all ?block socket =
     recv_all_wrapper recv ?block socket
@@ -540,10 +572,12 @@ module Socket = struct
 end
 
 module Proxy = struct
-  external zmq_proxy2 :
-    'a Socket.t -> 'b Socket.t -> unit = "caml_zmq_proxy2"
-  external zmq_proxy3 :
-    'a Socket.t -> 'b Socket.t -> 'c Socket.t -> unit = "caml_zmq_proxy3"
+  external zmq_proxy2_native : 'a Socket.t -> 'b Socket.t -> unit = "caml_zmq_proxy2"
+  let zmq_proxy2 socket = retry_on_intr2 zmq_proxy2_native socket
+
+  external zmq_proxy3_native : 'a Socket.t -> 'b Socket.t -> 'c Socket.t -> unit = "caml_zmq_proxy3"
+  let zmq_proxy3 socket = retry_on_intr3 zmq_proxy3_native socket
+
 
   let create ?capture frontend backend =
     match capture with
@@ -577,11 +611,15 @@ module Poll = struct
          Socket.t
     ), Out
 
-  external mask_of : 'a poll_mask array -> t = "caml_zmq_poll_of_pollitem_array"
-  external of_masks : 'a poll_mask array -> t = "caml_zmq_poll_of_pollitem_array"
-  external native_poll: t -> int -> poll_event option array = "caml_zmq_poll"
+  external mask_of_native : 'a poll_mask array -> t = "caml_zmq_poll_of_pollitem_array"
+  let mask_of mask = retry_on_intr1 mask_of_native mask
 
-  let poll ?(timeout = -1) items = native_poll items timeout
+  external of_masks_native : 'a poll_mask array -> t = "caml_zmq_poll_of_pollitem_array"
+  let of_masks mask = retry_on_intr1 of_masks_native mask
+
+  external poll_native: t -> int -> poll_event option array = "caml_zmq_poll"
+  let poll ?(timeout = -1) items =
+    poll_native items timeout
 
 end
 
@@ -609,7 +647,8 @@ module Monitor = struct
   | Handshake_failed_protocol of address * int
   | Handshake_failed_auth of address * int
 
-  external socket_monitor: 'a Socket.t -> string -> unit = "caml_zmq_socket_monitor"
+  external socket_monitor_native : 'a Socket.t -> string -> unit = "caml_zmq_socket_monitor"
+  let socket_monitor socket = retry_on_intr2 socket_monitor_native socket
 
   let create socket =
     (* Construct an anonymous inproc channel name *)
@@ -627,13 +666,13 @@ module Monitor = struct
     Socket.connect s t;
     s
 
-  external decode_monitor_event : string -> string -> event = "caml_decode_monitor_event"
+  external decode_monitor_event_native : string -> string -> event = "caml_decode_monitor_event"
+  let decode_monitor_event = retry_on_intr2 decode_monitor_event_native
 
   let recv ?block socket =
-    let event = Socket.recv ?block socket in
-    assert (Socket.has_more socket);
-    let addr = Socket.recv ~block:false socket in
-    decode_monitor_event event addr
+    match Socket.recv_all ?block socket with
+    | [event; addr] -> decode_monitor_event event addr
+    | _ -> assert false
 
   let get_peer_address fd =
     try
@@ -692,12 +731,17 @@ module Monitor = struct
 end
 
 module Z85 = struct
-  external encode : string -> string = "caml_z85_encode"
-  external decode : string -> string = "caml_z85_decode"
+  external encode_native : string -> string = "caml_z85_encode"
+  let encode = retry_on_intr1 encode_native
+
+  external decode_native : string -> string = "caml_z85_decode"
+  let decode = retry_on_intr1 decode_native
+
 end
 
 module Curve = struct
-  external keypair : unit -> string * string = "caml_curve_keypair"
+  external keypair_native : unit -> string * string = "caml_curve_keypair"
+  let keypair = retry_on_intr1 keypair_native
 end
 
 (* The following code is called by fail.c *)

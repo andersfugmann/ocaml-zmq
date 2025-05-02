@@ -283,6 +283,9 @@ module Poll : sig
   val of_masks : 'a poll_mask array -> t
 
   val poll : ?timeout:int -> t -> poll_event option array
+  (** Poll for event with a timeout.
+      @raise Unix.EINTR if a signal is received while waiting
+  *)
 end
 
 module Monitor : sig
