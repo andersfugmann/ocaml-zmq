@@ -194,35 +194,41 @@ module Make(T: Deferred.T) = struct
   let recv s = post s Receive (fun s -> Zmq.Socket.recv ~block:false s)
   let send s m = post s Send (fun s -> Zmq.Socket.send ~block:false s m)
 
-  let recv_msg s = post s Receive (fun s -> Zmq.Socket.recv_msg ~block:false s)
+  let recv_msg s =
+    post s Receive (fun s -> Zmq.Socket.recv_msg ~block:false s)
   let send_msg s m =
     post s Send (fun s -> Zmq.Socket.send_msg ~block:false s m)
 
-  (** Recevie all message blocks. *)
+  (* Function to allow resuming the receive if EAGAIN is raised. *)
+  let recv_all_wrapper f s =
+    let received = ref [] in
+    let rec recv_all_resumable s =
+      let msg = f s in
+      received := msg :: !received;
+      match Zmq.Socket.has_more s with
+      | false -> List.rev !received
+      | true -> recv_all_resumable s
+    in
+    post s Receive (recv_all_resumable)
 
-  let recv_all s =
-    (* The documentaton says that either all message parts are
-       transmitted, or none. So once a message becomes available, all
-       parts can be read wothout blocking.
+  let send_all_wrapper f s parts =
+    let pending = ref parts in
+    let rec send_all_resumable s =
+      match !pending with
+      | [] -> ()
+      | [msg] ->
+        f ?more:(Some false) s msg
+      | msg :: msgs ->
+        f ?more:(Some true) s msg;
+        pending := msgs;
+        send_all_resumable s
+    in
+    post s Send send_all_resumable
 
-       Also receiving a multipart message must not be interleaved with
-       another receving thread on the same socket.
-
-       We could have a read-mutex and a write mutex in order to limit
-       potential starvation of other threads while reading large
-       multipart messages.
-
-    *)
-    post s Receive (fun s -> Zmq.Socket.recv_all ~block:false s)
-
-  let send_all s parts =
-    (* See the comment in recv_all. *)
-    post s Send (fun s -> Zmq.Socket.send_all ~block:false s parts)
-
-  let recv_msg_all s =
-    post s Receive (fun s -> Zmq.Socket.recv_msg_all ~block:false s)
-  let send_msg_all s parts =
-    post s Send (fun s -> Zmq.Socket.send_msg_all ~block:false s parts)
+  let recv_all s = recv_all_wrapper (Zmq.Socket.recv ~block:false) s
+  let send_all s parts = send_all_wrapper (Zmq.Socket.send ~block:false) s parts
+  let recv_msg_all s = recv_all_wrapper (Zmq.Socket.recv_msg ~block:false) s
+  let send_msg_all s parts = send_all_wrapper (Zmq.Socket.send_msg ~block:false) s parts
 
   let close t =
     t.closing <- true;

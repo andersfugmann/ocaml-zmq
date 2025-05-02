@@ -167,7 +167,6 @@ module Socket = struct
   external get_int64_option_native : 'a t -> int64_option -> int = "caml_zmq_get_int64_option"
   let get_int64_option socket = retry_on_intr2 get_int64_option_native socket
 
-
   type string_option =
   | ZMQ_IDENTITY
   | ZMQ_SUBSCRIBE
@@ -543,6 +542,9 @@ module Socket = struct
       So, we assume that once the socket can send, all message-parts can be sent
       Therefore, all subsequent message parts are sent with [~block:true] to avoid the function raising EAGAIN,
       as its not possible to handle that gracefully - and may put the socket in a broken state.
+
+      Note. If SNDTIMEO is set to anything but -1, subsequent sends of the multipart message may still fail,
+      leaving half sent multipart messages.
   *)
   let send_all_wrapper (f : ?block:bool -> ?more:bool -> _ t -> _ -> unit) =
     (* Once the first message part is sent all remaining message parts can
