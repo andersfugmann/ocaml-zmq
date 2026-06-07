@@ -26,6 +26,7 @@ jobs:
             ocaml-version: 5
 
     runs-on: ${{ matrix.os }}
+    name: "OCaml ${{ matrix.ocaml-version }} (${{ matrix.eio && 'lwt, async, eio' || 'lwt, async' }})"
 
     steps:
       - name: Checkout code
