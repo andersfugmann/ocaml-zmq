@@ -26,7 +26,7 @@ end
 module Mailbox = struct
   type 'a t = 'a Async_kernel.Ivar.t
   let create () = Async_kernel.Ivar.create ()
-  let send t v = Async_kernel.Ivar.fill_exn t v
+  let send t v = (Async_kernel.Ivar.fill [@ocaml.warning "-3"]) t v
   let recv t = Async_kernel.Ivar.read t
 end
 
