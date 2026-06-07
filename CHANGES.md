@@ -1,3 +1,12 @@
+6.0.0 Unreleased.
+----
+* Fix problem related to EINTR that could lead to inconsistent state
+  when using multipart messages. Reported by @rand00.
+  - All ZMQ socket function now automatically retry in EINTR
+  - Async and Lwt versions now handle EAGAIN in the inner loop.
+
+* Fix deprecation warning on use of Async_kernel.Ivar.fill
+
 5.3.0
 ---
 * Add eio binding in zmq-eio (#126, @andersfugmann)
