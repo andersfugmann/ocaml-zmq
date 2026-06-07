@@ -106,42 +106,45 @@ module Make(T: Deferred.T) = struct
       and the fd can only be trusted after reading the status of the socket.
   *)
   let rec event_loop t =
+    let process queue =
+      (* What if there are no elements on the queue? *)
+      let f = Queue.peek queue in
+      try
+        f ();
+        (* Success, pop the sender *)
+        (Queue.pop queue : unit -> unit) |> ignore
+      with
+      | Retry -> (* If f raised EAGAIN, dont pop the message *) ()
+    in
     match t.closing with
-    | true -> Deferred.return ()
-    | false -> begin
-        let open Zmq.Socket in
-        let process queue =
-          let f = Queue.peek queue in
-          try
-            f ();
-            (* Success, pop the sender *)
-            (Queue.pop queue : unit -> unit) |> ignore
-          with
-          | Retry -> (* If f raised EAGAIN, dont pop the message *) ()
-        in
-        match events t.socket, Queue.is_empty t.senders, Queue.is_empty t.receivers with
-        | _, true, true ->
-          Condition.wait t.condition >>= fun () ->
-          event_loop t
-        | Poll_error, _, _ -> failwith "Cannot poll socket"
-        (* Prioritize send's to keep network busy *)
-        | Poll_in_out, false, _
-        | Poll_out, false, _ ->
-          process t.senders;
-          event_loop t
-        | Poll_in_out, _, false
-        | Poll_in, _, false ->
-          process t.receivers;
-          event_loop t
-        | Poll_in, _, true
-        | Poll_out, true, _
-        | No_event, _, _ ->
-          Condition.signal t.fd_condition ();
-          Condition.wait t.condition >>= fun () ->
-          event_loop t
-        | exception Unix.Unix_error(Unix.ENOTSOCK, "zmq_getsockopt", "") ->
-          Deferred.return ()
-      end
+    | true ->
+      Deferred.return ()
+    | false ->
+      let open Zmq.Socket in
+      match events t.socket, Queue.is_empty t.senders, Queue.is_empty t.receivers with
+      | _, true, true ->
+        Condition.wait t.condition >>= fun () ->
+        event_loop t
+      | Poll_error, _, _ -> failwith "Cannot poll socket"
+      (* Prioritize send's to keep network busy *)
+      | Poll_in_out, false, _
+      | Poll_out, false, _ ->
+        process t.senders;
+        event_loop t
+      | Poll_in_out, _, false
+      | Poll_in, _, false ->
+        process t.receivers;
+        event_loop t
+      | Poll_in, _, true
+      | Poll_out, true, _
+      | No_event, _, _ ->
+        Condition.signal t.fd_condition ();
+        Condition.wait t.condition >>= fun () ->
+        event_loop t
+      | exception Unix.Unix_error(Unix.EAGAIN, _, _) ->
+        event_loop t
+      | exception Unix.Unix_error(Unix.ENOTSOCK, "zmq_getsockopt", "") ->
+        Deferred.return ()
 
   let of_socket: ('a Zmq.Socket.t -> 'a t) of_socket_args = fun socket ->
     let fd = Fd.create (Zmq.Socket.get_fd socket) in
