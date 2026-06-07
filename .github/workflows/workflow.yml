@@ -1,8 +1,9 @@
 name: Main workflow
 
 on:
-  - pull_request
-  - push
+  push:
+    branches: [main]
+  pull_request:
 
 jobs:
   build:
@@ -10,14 +11,16 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-20.04
+          - ubuntu-latest
         ocaml-version:
           - 5
-          - 4.14.0
-          - 4.04.1
+          - 4
+          - 4.11
+        lwt:
+          - true
+        async:
+          - true
         include:
-          - lwt: true
-          - async: true
           - eio: true
             ocaml-version: 5
 
@@ -25,10 +28,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Use OCaml ${{ matrix.ocaml-version }}
-        uses: ocaml/setup-ocaml@v2
+        uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-version }}
           opam-local-packages: zmq.opam
