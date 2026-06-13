@@ -1,4 +1,4 @@
-(lang dune 2.7)
+(lang dune 3.18)
 (name zmq)
 
 (generate_opam_files true)
@@ -14,6 +14,7 @@
  (description "This library contains basic bindings for ZMQ.
 Lwt aware bindings to zmq are availble though package zmq-lwt
 Async aware bindings to zmq are available though package zmq-async")
+ (maintenance_intent "(latest)")
  (depends
   (ocaml (>= 4.03.0))
   conf-zmq
@@ -26,6 +27,7 @@ Async aware bindings to zmq are available though package zmq-async")
  (name zmq-async)
  (authors "Rudi Grinberg")
  (synopsis "Async-aware bindings to ZMQ")
+ (maintenance_intent "(latest)")
  (depends
   (ocaml (>= 4.04.1))
   (zmq (= :version))
@@ -38,6 +40,7 @@ Async aware bindings to zmq are available though package zmq-async")
  (name zmq-lwt)
  (authors "Anders Fugmann <anders@fugmann.net>")
  (synopsis "Lwt-aware bindings to ZMQ")
+ (maintenance_intent "(latest)")
  (depends
   (ocaml (>= 4.03.0))
   (zmq (= :version))
@@ -48,6 +51,7 @@ Async aware bindings to zmq are available though package zmq-async")
  (name zmq-eio)
  (authors "Anders Fugmann")
  (synopsis "Eio aware bindings to ZMQ")
+ (maintenance_intent "(latest)")
  (depends
   (ocaml (>= 4.04.1))
   (zmq (= :version))
