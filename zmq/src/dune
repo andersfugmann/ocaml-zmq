@@ -6,6 +6,7 @@
   (language c)
   (names caml_zmq_stubs socket context fail poll msg)
   (flags
+   :standard
    (:include c_flags.sexp)
    -Wall
    -Wextra
