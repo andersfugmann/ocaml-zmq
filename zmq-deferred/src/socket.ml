@@ -159,11 +159,11 @@ module Make(T: Deferred.T) = struct
     t
 
   type op = Send | Receive
-  let post: _ t -> op -> (_ Zmq.Socket.t -> 'a) -> 'a Deferred.t = fun t op f ->
-    let f' mailbox () =
-      let res = match f t.socket with
+  let post: _ t -> op -> (_ Zmq.Socket.t -> unit -> 'a) -> 'a Deferred.t = fun t op f ->
+    let f' f mailbox () =
+      let res = match f () with
         | v -> Ok v
-        | exception Unix.Unix_error (Unix.EAGAIN, _, _) ->
+        | exception Unix.Unix_error ((Unix.EAGAIN | Unix.EINTR), _, _) ->
           (* Signal try again *)
           raise Retry
         | exception exn -> Error exn
@@ -176,7 +176,7 @@ module Make(T: Deferred.T) = struct
     in
     let mailbox = Mailbox.create () in
     let should_signal = Queue.is_empty queue in
-    Queue.push (f' mailbox) queue;
+    Queue.push (f' (f t.socket) mailbox) queue;
 
     (* Wakeup the thread if the queue was empty *)
     begin
@@ -191,38 +191,25 @@ module Make(T: Deferred.T) = struct
 
   let to_socket t = t.socket
 
-  let recv s = post s Receive (fun s -> Zmq.Socket.recv ~block:false s)
-  let send s m = post s Send (fun s -> Zmq.Socket.send ~block:false s m)
+  let recv s = post s Receive (fun s () -> Zmq.Socket.recv ~block:false s)
+  let send s m = post s Send (fun s () -> Zmq.Socket.send ~block:false s m)
 
-  let recv_msg s = post s Receive (fun s -> Zmq.Socket.recv_msg ~block:false s)
+  let recv_msg s = post s Receive (fun s () -> Zmq.Socket.recv_msg ~block:false s)
   let send_msg s m =
-    post s Send (fun s -> Zmq.Socket.send_msg ~block:false s m)
+    post s Send (fun s () -> Zmq.Socket.send_msg ~block:false s m)
 
   (** Recevie all message blocks. *)
 
   let recv_all s =
-    (* The documentaton says that either all message parts are
-       transmitted, or none. So once a message becomes available, all
-       parts can be read wothout blocking.
-
-       Also receiving a multipart message must not be interleaved with
-       another receving thread on the same socket.
-
-       We could have a read-mutex and a write mutex in order to limit
-       potential starvation of other threads while reading large
-       multipart messages.
-
-    *)
-    post s Receive (fun s -> Zmq.Socket.recv_all ~block:false s)
+    post s Receive (fun s -> Zmq.Socket.recv_all_r ~block:false s)
 
   let send_all s parts =
-    (* See the comment in recv_all. *)
-    post s Send (fun s -> Zmq.Socket.send_all ~block:false s parts)
+    post s Send (fun s -> Zmq.Socket.send_all_r ~block:false s parts)
 
   let recv_msg_all s =
-    post s Receive (fun s -> Zmq.Socket.recv_msg_all ~block:false s)
+    post s Receive (fun s -> Zmq.Socket.recv_msg_all_r ~block:false s)
   let send_msg_all s parts =
-    post s Send (fun s -> Zmq.Socket.send_msg_all ~block:false s parts)
+    post s Send (fun s -> Zmq.Socket.send_msg_all_r ~block:false s parts)
 
   let close t =
     t.closing <- true;
@@ -247,7 +234,7 @@ module Make(T: Deferred.T) = struct
   end
 
   module Monitor = struct
-    let recv s = post s Receive (fun s -> Zmq.Monitor.recv ~block:false s)
+    let recv s = post s Receive (fun s -> Zmq.Monitor.recv_r ~block:false s)
   end
 
 end

@@ -10,6 +10,22 @@ type error =
 
 exception ZMQ_exception of error * string
 
+(** Resumable.
+    Allows repeated calls until the operation has
+    completed.
+    This is needed when reading or writing multipart messages. If EINTR is not
+    handled corretly, the socket may be left with a half written/read
+    message which will break subsequent operations.
+
+    For this reason, if EINTR is raised its important to repeat the
+    call to the resumable to avoid the the socket go into a broken
+    state.
+
+    For all [resumable]s the creation of the resumable does not send or receive any messages - that happend only when the resumable is evaluated.
+
+*)
+type 'a resumable = unit -> 'a
+
 val version : unit -> int * int * int
 
 module Context : sig
@@ -103,50 +119,77 @@ module Socket : sig
   val recv : ?block:bool -> 'a t -> string
 
   (** Read a complete multipart message from the socket.
-      block indicates if the call should be blocking or non-blocking. Default true
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated This function is unsafe wtr EINTR signals. Use {!recv_all_r} to allow resuming the operation
   *)
   val recv_all : ?block:bool -> 'a t -> string list
 
+  (** Read a complete multipart message from the socket.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @return {!resumable} to allow resuming the operation in case of EINTR or EAGAIN.
+  *)
+  val recv_all_r : ?block:bool -> 'a t -> string list resumable
+
   (** Send a message to the socket.
-      block indicates if the call should be blocking or non-blocking. Default true
-      more is used for multipart messages, and indicates that the more message parts will follow. Default false
+      @param block indicates if the call should be blocking or non-blocking.
+             Defaults to [true].
+      @param more indicate that more messages will follow and will be joined into a multipart message.
+             Defaults to [true].
   *)
   val send : ?block:bool -> ?more:bool -> 'a t -> string -> unit
 
   (** Send a multipart message to the socket.
-      block indicates if the call should be blocking or non-blocking. Default true
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated This function is unsafe wtr EINTR signals. Use {!send_all_r} to allow resuming the operation
   *)
   val send_all : ?block:bool -> 'a t -> string list -> unit
 
-  (** Receive a {!Msg.t} on the socket.
+  (** Send a multipart message to the socket.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @return {!resumable} to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val send_all_r : ?block:bool -> 'a t -> string list -> unit resumable
 
+
+  (** Receive a {!Msg.t} on the socket.
       @param block indicates if the call should be blocking or non-blocking.
              Defaults to [true].
   *)
   val recv_msg : ?block:bool -> 'a t -> Msg.t
 
   (** Receive a multi-part message on the socket.
-
-      @param block indicates if the call should be blocking or non-blocking.
-             Defaults to [true].
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated This function is unsafe wtr EINTR signals. Use {!recv_msg_all_r} to allow resuming the operation
   *)
   val recv_msg_all : ?block:bool -> 'a t -> Msg.t list
 
-  (** Send a {!Msg.t} to the socket.
+  (** Receive a multi-part message on the socket.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @return {!resumable} to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val recv_msg_all_r : ?block:bool -> 'a t -> Msg.t list resumable
 
+(** Send a {!Msg.t} to the socket.
       @param block indicates if the call should be blocking or non-blocking.
              Defaults to [true].
       @param more is used for multipart messages  Set to [true] to indicate that
-             more message parts will follow.  Defaults to [false].
+             more message parts will follow. Defaults to [false].
   *)
   val send_msg : ?block:bool -> ?more:bool -> 'a t -> Msg.t -> unit
 
   (** Send a multi-part message to the socket.
-
       @param block indicates if the call should be blocking or non-blocking.
              Defaults to [true].
+      @deprecated This function is unsafe wtr EINTR signals. Use {!send_msg_all_r} to allow resuming the operation
   *)
   val send_msg_all : ?block:bool -> 'a t -> Msg.t list -> unit
+
+  (** Send a multi-part message to the socket.
+      @param block indicates if the call should be blocking or non-blocking.
+             Defaults to [true].
+      @return {!resumable} to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val send_msg_all_r : ?block:bool -> 'a t -> Msg.t list -> unit resumable
 
   (** Option Getter and Setters *)
 
@@ -314,9 +357,16 @@ module Monitor : sig
   val connect: Context.t -> t -> [<`Monitor] Socket.t
 
   (** Receive an event from the monitor socket.
-      block indicates if the call should be blocking or non-blocking. Default true
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @deprecated This function is unsafe wtr EINTR signals. Use {!recv_r} to allow resuming the operation
   *)
   val recv: ?block:bool -> [< `Monitor ] Socket.t -> event
+
+  (** Receive an event from the monitor socket.
+      @param block indicates if the call should be blocking or non-blocking. Defaults to [true].
+      @return {!resumable} to allow resuming the operation in case of EINTR or EGAGIN.
+  *)
+  val recv_r: ?block:bool -> [< `Monitor ] Socket.t -> event resumable
 
   val string_of_event: event -> string
 

@@ -216,6 +216,23 @@ let test_unix_exceptions = bracket
        Zmq.Context.terminate ctx
     )
 
+(** Simple test to test eagain is raised when reading nonblocking from an empty queue *)
+let test_zmq_eagain = bracket
+    (fun () ->
+       let ctx = Zmq.Context.create () in
+       let s = Zmq.Socket.create ctx pull in
+       (ctx, s)
+    )
+    (fun (_, s) ->
+       assert_raises ~msg:"Failed to raise EAGAIN" Unix.(Unix_error(EAGAIN, "zmq_msg_recv", ""))  (fun _ -> Zmq.Socket.recv ~block:false s);
+       ()
+    )
+    (fun (ctx, s) ->
+       Zmq.Socket.close s;
+       Zmq.Context.terminate ctx
+    )
+
+
 (** Test a Zmq specific exception *)
 let test_zmq_exception = bracket
   (fun () ->
@@ -232,6 +249,8 @@ let test_zmq_exception = bracket
      Zmq.Socket.close socket;
      Zmq.Context.terminate ctx;
   )
+
+
 
 let test_socket_gc () =
   let sock =
@@ -311,11 +330,18 @@ let suite =
              let endpoint = "inproc://endpoint" in
              bind rep endpoint;
              connect req endpoint;
-             send_all req ["request"; "and more"];
-             let msg = recv_all rep in
+             let send = send_all_r req ["request"; "and more"] in
+             send ();
+
+
+             let recv = recv_all_r rep in
+             let msg = recv () in
              assert_equal ["request"; "and more"] msg;
-             send_all rep ["reply"; "and more"];
-             let msg = recv_all req in
+             let send = send_all_r rep ["reply"; "and more"] in
+             send ();
+             let recv = recv_all_r req in
+             let msg = recv () in
+
              assert_equal ["reply"; "and more"] msg
            )
            (fun (ctx, req, rep) ->
@@ -362,7 +388,8 @@ let suite =
       "monitor" >:: test_monitor;
       "z85 encoding/decoding" >:: test_z85;
       "unix exceptions" >:: test_unix_exceptions;
-      "zmq exceptions" >:: test_zmq_exception;
+      "zmq exception intr" >:: test_zmq_exception;
+      "zmq exception eagain" >:: test_zmq_eagain;
       (* Gc tests disabled, as resources will not be freed through finalisers
          "socket gc" >:: test_socket_gc;
          "context gc" >:: test_context_gc;

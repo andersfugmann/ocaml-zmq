@@ -13,6 +13,9 @@ exception ZMQ_exception of error * string
 
 external version : unit -> int * int * int = "caml_zmq_version"
 
+type 'a resumable = unit -> 'a
+
+
 module Context = struct
   type t
 
@@ -492,6 +495,42 @@ module Socket = struct
   type event = No_event | Poll_in | Poll_out | Poll_in_out | Poll_error
   external events : 'a t -> event = "caml_zmq_get_events"
 
+
+  (** Allow resuming receive of a multipart message.
+      The function returns a function that can be "resumed" in case of EGAGIN or EINTR.
+  *)
+  let recv_all_wrapper_resumable: (?block:bool -> _ t -> 'a) -> ?block:bool -> _ t -> 'a list resumable = fun f ?block socket ->
+    let received = ref [] in
+    let rec cont f ?block () =
+      let message = f ?block socket in
+      received := message :: !received;
+      match has_more socket with
+      | true ->
+        cont f ~block:false ()
+      | false ->
+        (* Convert the queue to a list *)
+        List.rev !received
+    in
+    cont f ?block
+
+  (** Allow resuming send of a multipart message.
+      The function returns a function that can be "resumed" in case of EGAGIN or EINTR.
+  *)
+  let send_all_wrapper_resumable: (?block:bool -> ?more:bool -> _ t -> 'a -> unit) -> ?block:bool -> _ t -> 'a list -> unit resumable = fun f ?block socket messages ->
+    let messages = ref messages in
+    let rec cont (f: (?block:bool -> ?more:bool -> _ t -> 'a -> unit)) ?block socket () =
+      match !messages with
+      | [] -> ()
+      | [ msg ] ->
+        f ?block ~more:false socket msg
+      | msg :: msgs ->
+        f ?block ~more:true socket msg;
+        messages := msgs;
+        cont f ~block:true socket ()
+    in
+    cont f ?block socket
+
+  (** This function should never be used. It does not allow resuming if a signal is received, which may leave half read multi part messages on the socket. *)
   let recv_all_wrapper (f : ?block:bool -> _ t -> _) =
     (* Once the first message part is received all remaining message parts can
        be received without blocking. *)
@@ -529,14 +568,26 @@ module Socket = struct
   let recv_all ?block socket =
     recv_all_wrapper recv ?block socket
 
+  let recv_all_r ?block socket =
+    recv_all_wrapper_resumable recv ?block socket
+
   let send_all ?block socket message =
     send_all_wrapper send ?block socket message
+
+  let send_all_r ?block socket message =
+    send_all_wrapper_resumable send ?block socket message
 
   let recv_msg_all ?block socket =
     recv_all_wrapper recv_msg ?block socket
 
+  let recv_msg_all_r ?block socket =
+    recv_all_wrapper_resumable recv_msg ?block socket
+
   let send_msg_all ?block socket message =
     send_all_wrapper send_msg ?block socket message
+
+  let send_msg_all_r ?block socket message =
+    send_all_wrapper_resumable send_msg ?block socket message
 end
 
 module Proxy = struct
@@ -634,6 +685,20 @@ module Monitor = struct
     assert (Socket.has_more socket);
     let addr = Socket.recv ~block:false socket in
     decode_monitor_event event addr
+
+  let recv_r ?block socket =
+    let event = ref None in
+    let rec cont () =
+      match !event with
+      | None ->
+        event := Some (Socket.recv ?block socket);
+        cont ()
+      | Some event ->
+        assert (Socket.has_more socket);
+        let addr = Socket.recv ~block:false socket in
+        decode_monitor_event event addr
+    in
+    cont
 
   let get_peer_address fd =
     try
