@@ -16,8 +16,7 @@ external version : unit -> int * int * int = "caml_zmq_version"
 let rec retry_on_intr1 f a = try f a with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr1 f a
 let rec retry_on_intr2 f a b = try f a b with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr2 f a b
 let rec retry_on_intr3 f a b c = try f a b c with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr3 f a b c
-let rec retry_on_intr4: ('a -> 'b -> 'c -> 'd -> 'ret) -> 'a -> 'b -> 'c -> 'd -> 'ret = fun f a b c d ->
-  try f a b c d with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr4 f a b c d
+let rec retry_on_intr4 f a b c d = try f a b c d with | Unix.Unix_error (Unix.EINTR, _, _) -> retry_on_intr4 f a b c d
 
 
 module Context = struct
