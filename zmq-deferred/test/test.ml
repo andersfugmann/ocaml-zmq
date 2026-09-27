@@ -15,6 +15,7 @@ module Make(T: Zmq_deferred.Deferred.T) = struct
   module Socket = Zmq_deferred.Socket.Make(T)
 
   let all_ok l =  List.fold_left (fun acc a -> acc >>= fun () -> a) (T.Deferred.return ()) l
+
   let setup () =
     let make ctx tpe =
       let s = Zmq.Socket.create ctx tpe in

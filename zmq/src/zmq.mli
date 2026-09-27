@@ -17,6 +17,9 @@ module Context : sig
 
   val create : unit -> t
   val terminate : t -> unit
+  (** Terminate the context, waiting for its sockets to close.
+      @raise Unix.EINTR if a signal is received while waiting.
+  *)
 
   val get_io_threads : t -> int
   val set_io_threads : t -> int -> unit
@@ -243,6 +246,9 @@ end
 
 module Proxy : sig
   val create: ?capture:[< `Pub|`Dealer|`Push|`Pair] Socket.t -> 'a Socket.t -> 'b Socket.t -> unit
+  (** Run a blocking proxy between two sockets.
+      @raise Unix.EINTR if a signal is received while proxying.
+  *)
 end
 
 module Poll : sig

@@ -25,8 +25,7 @@ module Context = struct
   external create_native : unit -> t = "caml_zmq_new"
   let create = retry_on_intr1 create_native
 
-  external terminate_native : t -> unit = "caml_zmq_term"
-  let terminate = retry_on_intr1 terminate_native
+  external terminate : t -> unit = "caml_zmq_term"
 
   type int_option =
   | ZMQ_IO_THREADS
@@ -573,12 +572,10 @@ module Socket = struct
 end
 
 module Proxy = struct
-  external zmq_proxy2_native : 'a Socket.t -> 'b Socket.t -> unit = "caml_zmq_proxy2"
-  let zmq_proxy2 socket = retry_on_intr2 zmq_proxy2_native socket
-
-  external zmq_proxy3_native : 'a Socket.t -> 'b Socket.t -> 'c Socket.t -> unit = "caml_zmq_proxy3"
-  let zmq_proxy3 socket = retry_on_intr3 zmq_proxy3_native socket
-
+  external zmq_proxy2 :
+    'a Socket.t -> 'b Socket.t -> unit = "caml_zmq_proxy2"
+  external zmq_proxy3 :
+    'a Socket.t -> 'b Socket.t -> 'c Socket.t -> unit = "caml_zmq_proxy3"
 
   let create ?capture frontend backend =
     match capture with
