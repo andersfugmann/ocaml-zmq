@@ -3,7 +3,7 @@
 
 (generate_opam_files true)
 
-(source (github issuu/ocaml-zmq))
+(source (github andersfugmann/ocaml-zmq))
 (license MIT)
 (maintainers "Anders Fugmann <anders@fugmann.net>")
 
