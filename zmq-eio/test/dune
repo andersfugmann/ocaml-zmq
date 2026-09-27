@@ -1,6 +1,6 @@
 (executable
  (name test)
- (libraries zmq-eio ounit2 eio eio_main))
+ (libraries zmq-eio ounit2 eio eio_main zmq_eintr_test))
 
 (rule
  (alias runtest)

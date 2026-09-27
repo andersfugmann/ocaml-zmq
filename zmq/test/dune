@@ -1,6 +1,12 @@
+(library
+ (name zmq_eintr_test)
+ (modules zmq_eintr_test)
+ (libraries ounit2 threads zmq))
+
 (executable
  (name test)
- (libraries ounit2 zmq threads))
+ (modules test zmq_test fd_usage curve)
+ (libraries ounit2 zmq threads zmq_eintr_test))
 
 (rule
  (alias runtest)

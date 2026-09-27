@@ -122,6 +122,7 @@ module Make(T: Zmq_deferred.Deferred.T) = struct
     in
 
     __MODULE__ >::: [
+      "test_eintr"          >:: Zmq_eintr_test.test;
       "test_send_receive"   >:: bracket setup test_send_receive teardown;
       "test_msend_mreceive" >:: bracket setup test_msend_mreceive teardown;
       "test_mix"            >:: bracket setup test_mix teardown;

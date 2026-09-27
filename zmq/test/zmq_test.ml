@@ -365,6 +365,7 @@ let suite =
       "monitor" >:: test_monitor;
       "z85 encoding/decoding" >:: test_z85;
       "unix exceptions" >:: test_unix_exceptions;
+      "retry interrupted receive" >:: Zmq_eintr_test.test;
       "zmq exceptions" >:: test_zmq_exception;
       (* Gc tests disabled, as resources will not be freed through finalisers
          "socket gc" >:: test_socket_gc;

@@ -150,6 +150,7 @@ let suite () =
   in
 
   __MODULE__ >::: [
+    "test_eintr"            >:: Zmq_eintr_test.test;
     "test_setup_teardown"   >:: bracket test_setup_teardown;
     "test_send_receive"     >:: bracket test_send_receive;
     "test_msend_mreceive"   >:: bracket test_msend_mreceive;
