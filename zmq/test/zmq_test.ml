@@ -204,6 +204,9 @@ let test_unix_exceptions = bracket
        (ctx, s)
     )
     (fun (_, s) ->
+       set_receive_timeout s 1000;
+       assert_raises ~msg:"Failed to raise EAGAIN" Unix.(Unix_error(EAGAIN, "zmq_msg_recv", ""))
+         (fun _ -> Zmq.Socket.recv_msg ~block:false s);
 
        let mask = Zmq.Poll.of_masks [| s, Zmq.Poll.In |] in
        Sys.(set_signal sigalrm (Signal_handle (fun _ -> ())));
@@ -362,6 +365,7 @@ let suite =
       "monitor" >:: test_monitor;
       "z85 encoding/decoding" >:: test_z85;
       "unix exceptions" >:: test_unix_exceptions;
+      "retry interrupted receive" >:: Zmq_eintr_test.test;
       "zmq exceptions" >:: test_zmq_exception;
       (* Gc tests disabled, as resources will not be freed through finalisers
          "socket gc" >:: test_socket_gc;

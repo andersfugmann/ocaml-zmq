@@ -1,5 +1,13 @@
-Unreleased
-----------
+6.0.0 Unreleased.
+----
+* Fix problem related to EINTR that could lead to inconsistent state
+  when using multipart messages. Reported by @rand00.
+  - ZMQ operations now automatically retry on EINTR, except context
+    termination, polling, and proxying.
+  - Async and Lwt versions now handle EAGAIN in the inner loop.
+
+* Fix deprecation warning on use of Async_kernel.Ivar.fill
+
 * Allow other OCaml threads to run while `Context.terminate` waits for all
   sockets to close.
 
