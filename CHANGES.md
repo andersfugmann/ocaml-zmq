@@ -1,3 +1,8 @@
+Unreleased
+----------
+* Allow other OCaml threads to run while `Context.terminate` waits for all
+  sockets to close.
+
 5.3.0
 ---
 * Add eio binding in zmq-eio (#126, @andersfugmann)

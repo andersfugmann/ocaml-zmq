@@ -79,8 +79,13 @@ CAMLprim value caml_zmq_new(value unit) {
 
 CAMLprim value caml_zmq_term(value ctx) {
     CAMLparam1 (ctx);
+    void *context = CAML_ZMQ_Context_val(ctx);
 
-    int result = zmq_ctx_term(CAML_ZMQ_Context_val(ctx));
+    /* Termination may wait for sockets to close, including sockets owned by
+       other OCaml threads. */
+    caml_release_runtime_system();
+    int result = zmq_ctx_term(context);
+    caml_acquire_runtime_system();
     caml_zmq_raise_if(result == -1, "zmq_ctx_term");
 
     CAML_ZMQ_Context_val(ctx) = NULL;
