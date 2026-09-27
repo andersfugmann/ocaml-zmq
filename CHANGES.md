@@ -1,15 +1,22 @@
-6.0.0 Unreleased.
+6.0.0: 2026-09-27
 ----
-* Fix problem related to EINTR that could lead to inconsistent state
-  when using multipart messages. Reported by @rand00.
-  - ZMQ operations now automatically retry on EINTR, except context
-    termination, polling, and proxying.
-  - Async and Lwt versions now handle EAGAIN in the inner loop.
+* Fix Eio multipart sending: `send_all` and `send_msg_all` now pass their
+  messages correctly and use the sender queue. Add multipart send/receive
+  coverage (#132, @ComanderP).
 
-* Fix deprecation warning on use of Async_kernel.Ivar.fill
+* Handle EINTR without leaving sockets in an inconsistent multipart state:
+  - ZMQ operations automatically retry on EINTR, except context termination,
+    polling, and proxying, which remain interruptible.
+  - Async and Lwt multipart operations can resume after EAGAIN, and their
+    event loop handles EAGAIN while reading socket events.
+  - Add EINTR regression tests for the core, Async, Lwt, and Eio packages.
+  Thanks to @rand00 for reporting and working on the multipart problems.
 
 * Allow other OCaml threads to run while `Context.terminate` waits for all
   sockets to close.
+
+* Keep the Async bindings compatible with Async v0.15 while suppressing the
+  deprecation warning for `Async_kernel.Ivar.fill`.
 
 5.3.0
 ---
