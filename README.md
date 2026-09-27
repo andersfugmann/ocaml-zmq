@@ -7,9 +7,10 @@ Dependencies
 ------------
 
   * [OPAM](http://opam.ocaml.org/)
+  * Dune >= 3.18
   * OCaml >= 4.03.0
-  * OCaml >= 4.04.1, Async >= v0.11.0 for zmq-async
-  * Ocaml >= 5.0.0 for zmq-eio
+  * OCaml >= 4.04.1, Async >= v0.15.0 for zmq-async
+  * OCaml >= 5.0.0, Eio >= 0.10 for zmq-eio
   * Lwt >= 2.6.0 for zmq-lwt
   * libzmq (c lib) >= 4.x
 
